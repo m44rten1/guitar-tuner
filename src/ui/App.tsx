@@ -33,10 +33,6 @@ export default function App() {
         <Gauge cents={cents()} active={isDetected()} />
         <NoteDisplay state={state()} />
       </Show>
-
-      <Show when={state().status === "listening" && !isDetected()}>
-        <div class="listening-hint">Listening…</div>
-      </Show>
     </div>
   );
 }

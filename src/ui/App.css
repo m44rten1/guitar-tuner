@@ -21,8 +21,13 @@
 }
 
 @keyframes pulse-prompt {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* --- Note display --- */
@@ -38,8 +43,11 @@
   font-size: 5rem;
   font-weight: 700;
   line-height: 1;
+  min-height: 5rem;
   color: #555;
-  transition: color 200ms ease, text-shadow 300ms ease;
+  transition:
+    color 200ms ease,
+    text-shadow 300ms ease;
 }
 
 .note-name--active {
@@ -55,7 +63,8 @@
 }
 
 @keyframes glow-pulse {
-  0%, 100% {
+  0%,
+  100% {
     text-shadow:
       0 0 20px rgba(76, 175, 80, 0.5),
       0 0 40px rgba(76, 175, 80, 0.25);
@@ -91,13 +100,4 @@
 
 .cents-readout--in-tune {
   color: #4caf50;
-}
-
-/* --- Listening hint --- */
-
-.listening-hint {
-  font-size: 0.9rem;
-  color: #666;
-  letter-spacing: 0.03em;
-  animation: pulse-prompt 2s ease-in-out infinite;
 }
