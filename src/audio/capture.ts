@@ -12,7 +12,7 @@ export interface AudioCapture {
  * Creates a mic capture pipeline:
  * getUserMedia -> AnalyserNode -> rAF loop -> YIN -> octave correction -> smoother -> callback
  *
- * Automatically recovers when iOS suspends audio in the background.
+ * Stops the mic when the page is hidden and restarts when visible again.
  */
 export function createAudioCapture(
   onState: (state: TunerState) => void,
@@ -25,28 +25,9 @@ export function createAudioCapture(
 
   function onVisibilityChange() {
     if (document.visibilityState === "visible") {
-      handleResume();
-    }
-  }
-
-  async function handleResume(): Promise<void> {
-    if (!audioContext || !stream) return;
-
-    const tracksAlive = stream
-      .getAudioTracks()
-      .some((t) => t.readyState === "live");
-
-    if (!tracksAlive) {
-      await restart();
-      return;
-    }
-
-    if (audioContext.state === "suspended") {
-      try {
-        await audioContext.resume();
-      } catch {
-        await restart();
-      }
+      restart();
+    } else {
+      releaseResources();
     }
   }
 
@@ -125,13 +106,12 @@ export function createAudioCapture(
     }
   }
 
-  /** Releases all resources without changing UI state. */
-  function teardown(): void {
+  /** Releases audio resources but keeps the visibility listener. */
+  function releaseResources(): void {
     if (rafId !== null) {
       cancelAnimationFrame(rafId);
       rafId = null;
     }
-    document.removeEventListener("visibilitychange", onVisibilityChange);
     stream?.getAudioTracks().forEach((t) => {
       t.onended = null;
     });
@@ -140,6 +120,12 @@ export function createAudioCapture(
     audioContext?.close();
     audioContext = null;
     smoother.reset();
+  }
+
+  /** Releases all resources and removes event listeners. */
+  function teardown(): void {
+    releaseResources();
+    document.removeEventListener("visibilitychange", onVisibilityChange);
   }
 
   function stop(): void {
