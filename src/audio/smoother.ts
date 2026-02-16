@@ -2,7 +2,7 @@ import type { PitchResult } from "../tuner/types";
 import { frequencyToNote } from "../tuner/note-mapping";
 
 const MEDIAN_WINDOW = 5;
-const EMA_ALPHA = 0.15;
+const EMA_ALPHA = 0.1;
 const MIN_CLARITY = 0.85;
 const STABILITY_WINDOW = 5;
 const STABILITY_SPREAD_CENTS = 30;
