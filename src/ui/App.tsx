@@ -23,7 +23,11 @@ export default function App() {
   async function startCapture() {
     if (state().status !== "idle") return;
     capture = createAudioCapture(setState);
-    await capture.start();
+    try {
+      await capture.start();
+    } catch {
+      capture = null;
+    }
   }
 
   onMount(async () => {
