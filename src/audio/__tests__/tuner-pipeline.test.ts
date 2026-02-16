@@ -38,10 +38,10 @@ function runPipeline(filePath: string) {
   const corrected = correctOctaveErrors(raw, chunk, wav.sampleRate);
   if (!corrected) return null;
 
-  // Feed several identical frames to get past the confidence gating (3 consecutive)
+  // Feed identical frames to fill the stability window (5) plus a couple extra for median/EMA
   const smoother = new PitchSmoother();
   let result = null;
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     result = smoother.process(corrected, 1000 + i * 33);
   }
 

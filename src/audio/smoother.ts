@@ -2,9 +2,11 @@ import type { PitchResult } from "../tuner/types";
 import { frequencyToNote } from "../tuner/note-mapping";
 
 const MEDIAN_WINDOW = 5;
-const EMA_ALPHA = 0.3;
+const EMA_ALPHA = 0.15;
 const MIN_CLARITY = 0.85;
-const MIN_CONSECUTIVE_CONFIDENT = 3;
+const STABILITY_WINDOW = 5;
+const STABILITY_SPREAD_CENTS = 30;
+const NOTE_CHANGE_CENTS = 150;
 const HYSTERESIS_MS = 100;
 
 export interface SmoothedResult {
@@ -18,7 +20,7 @@ export interface SmoothedResult {
 export class PitchSmoother {
   private medianBuffer: number[] = [];
   private emaFrequency: number | null = null;
-  private consecutiveConfident = 0;
+  private stabilityBuffer: number[] = [];
   private currentNote: string | null = null;
   private currentOctave: number | null = null;
   private pendingNote: string | null = null;
@@ -28,7 +30,7 @@ export class PitchSmoother {
   reset(): void {
     this.medianBuffer = [];
     this.emaFrequency = null;
-    this.consecutiveConfident = 0;
+    this.stabilityBuffer = [];
     this.currentNote = null;
     this.currentOctave = null;
     this.pendingNote = null;
@@ -36,27 +38,43 @@ export class PitchSmoother {
     this.pendingNoteTimestamp = null;
   }
 
-  /** Process a new pitch reading. Returns null if not yet confident enough. */
+  /** Process a new pitch reading. Returns null if not yet stable enough. */
   process(result: PitchResult, now: number = Date.now()): SmoothedResult | null {
-    // Confidence gating
+    // Clarity gate: require high-confidence reading
     if (result.clarity < MIN_CLARITY) {
-      this.consecutiveConfident = 0;
+      this.stabilityBuffer = [];
       return null;
     }
 
-    this.consecutiveConfident++;
-    if (this.consecutiveConfident < MIN_CONSECUTIVE_CONFIDENT) {
+    // Note-change detection: reset when a clearly different note appears
+    if (this.emaFrequency !== null) {
+      const centsDiff = Math.abs(1200 * Math.log2(result.frequency / this.emaFrequency));
+      if (centsDiff > NOTE_CHANGE_CENTS) {
+        this.reset();
+      }
+    }
+
+    // Stability buffer: collect confident readings and check convergence
+    this.stabilityBuffer.push(result.frequency);
+    if (this.stabilityBuffer.length > STABILITY_WINDOW) {
+      this.stabilityBuffer.shift();
+    }
+
+    if (this.stabilityBuffer.length < STABILITY_WINDOW) {
       return null;
     }
 
-    // Median filter
+    if (this.stabilitySpreadCents() > STABILITY_SPREAD_CENTS) {
+      return null;
+    }
+
+    // Readings are stable — proceed with median + EMA
     this.medianBuffer.push(result.frequency);
     if (this.medianBuffer.length > MEDIAN_WINDOW) {
       this.medianBuffer.shift();
     }
     const medianFreq = median(this.medianBuffer);
 
-    // EMA smoothing
     if (this.emaFrequency === null) {
       this.emaFrequency = medianFreq;
     } else {
@@ -66,7 +84,6 @@ export class PitchSmoother {
     const smoothedFreq = this.emaFrequency;
     const noteInfo = frequencyToNote(smoothedFreq);
 
-    // Hysteresis on note name: don't switch unless stable for HYSTERESIS_MS
     const displayNote = this.applyHysteresis(
       noteInfo.note,
       noteInfo.octave,
@@ -80,6 +97,12 @@ export class PitchSmoother {
       octave: displayNote.octave,
       cents: noteInfo.cents,
     };
+  }
+
+  private stabilitySpreadCents(): number {
+    const min = Math.min(...this.stabilityBuffer);
+    const max = Math.max(...this.stabilityBuffer);
+    return 1200 * Math.log2(max / min);
   }
 
   private applyHysteresis(
